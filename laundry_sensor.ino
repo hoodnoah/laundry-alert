@@ -7,6 +7,10 @@ const int POLLING_INTERVAL = 1; // polling interval in ms
 
 void setup()
 {
+  // set pins as input
+  pinMode(PIEZO_1, INPUT);
+  pinMode(PIEZO_2, INPUT);
+
   Serial.begin(BAUD_RATE);
 }
 
