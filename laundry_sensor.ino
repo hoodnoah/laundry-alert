@@ -1,10 +1,7 @@
 #include <Arduino_LSM6DS3.h>
 
-const int BAUD_RATE = 115200;
-const int POLLING_INTERVAL = 1; // polling interval in ms
-#define BUFFER_SIZE 200
-#define OUTPUT_BUFFER_SIZE 53
-const int combinedOutputSize = BUFFER_SIZE * (OUTPUT_BUFFER_SIZE + 1); // +1 for newline
+#define BAUD_RATE 115200
+#define OUTPUT_BUFFER_SIZE 54 // 53 chars + newling
 
 typedef struct SensorReading
 {
@@ -14,12 +11,20 @@ typedef struct SensorReading
   float z;
 } SensorReading;
 
+// reusable reading struct
+SensorReading reading = SensorReading{0, 0.0, 0.0, 0.0};
+
+// reusable string buffer for a single reading
+char outputBuffer[OUTPUT_BUFFER_SIZE]; // +1 for newline
+
+// converts a float to a fixed point string w/ 3 significant figures
 void floatToFixedString(char *buffer, size_t bufferSize, float value)
 {
   int scaledValue = (int)(value * 1000);
   snprintf(buffer, bufferSize, "%d.%03d", scaledValue / 1000, abs(scaledValue % 1000));
 }
 
+// fills a string with a formatted version of the SensorReading struct
 int sensorReadingToString(char *outputBuffer, size_t bufferSize, const SensorReading &sensorReading)
 {
   char xBuffer[9], yBuffer[9], zBuffer[9];
@@ -28,16 +33,6 @@ int sensorReadingToString(char *outputBuffer, size_t bufferSize, const SensorRea
   floatToFixedString(zBuffer, sizeof(zBuffer), sensorReading.z);
   return snprintf(outputBuffer, bufferSize, "%lu -> (%s, %s, %s)\n", sensorReading.timestamp, xBuffer, yBuffer, zBuffer);
 }
-
-// buffer of reading objects
-SensorReading buffer[BUFFER_SIZE];
-int bufferIndex = 0;
-
-// reusable string buffer for a single reading
-char outputBuffer[OUTPUT_BUFFER_SIZE + 1]; // +1 for newline
-
-// reusable output string buffer to reduce Serial.print(...) calls
-char combinedOutput[combinedOutputSize];
 
 void setup()
 {
@@ -60,28 +55,6 @@ void setup()
   Serial.println("(x, y, z)");
 }
 
-// flushes buffer to serial
-void flush_buffer(SensorReading *buffer, int &bufferIndex)
-{
-  // set combinedOutput to empty string
-  combinedOutput[0] = '\0';
-
-  for (int i = 0; i < bufferIndex; i++)
-  {
-    int length = sensorReadingToString(outputBuffer, sizeof(outputBuffer), buffer[i]);
-    if (length < 0)
-    {
-      Serial.println("error formatting sensor reading...");
-      continue;
-    }
-    strncat(combinedOutput, outputBuffer, sizeof(combinedOutput) - strlen(combinedOutput) - 1);
-  }
-
-  Serial.print(combinedOutput);
-  Serial.flush();
-  bufferIndex = 0;
-}
-
 void loop()
 {
   float x, y, z;
@@ -99,19 +72,16 @@ void loop()
     }
     else
     {
-      // add to serial printing buffer
-      buffer[bufferIndex].timestamp = currentMillis;
-      buffer[bufferIndex].x = x;
-      buffer[bufferIndex].y = y;
-      buffer[bufferIndex].z = z;
+      reading.timestamp = currentMillis;
+      reading.x = x;
+      reading.y = y;
+      reading.z = z;
 
-      bufferIndex++;
+      sensorReadingToString(outputBuffer, OUTPUT_BUFFER_SIZE, reading);
+      Serial.print(outputBuffer);
+      Serial.flush();
+      outputBuffer[0] = '\0';
     }
   }
-
-  if (bufferIndex >= BUFFER_SIZE)
-  {
-    flush_buffer(buffer, bufferIndex);
-  }
-  delay(30);
+  delay(15);
 }
