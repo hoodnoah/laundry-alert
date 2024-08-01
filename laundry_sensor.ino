@@ -1,7 +1,43 @@
 #include <Arduino_LSM6DS3.h>
 
-const int BAUD_RATE = 9600;
+const int BAUD_RATE = 115200;
 const int POLLING_INTERVAL = 1; // polling interval in ms
+#define BUFFER_SIZE 200
+#define OUTPUT_BUFFER_SIZE 53
+const int combinedOutputSize = BUFFER_SIZE * (OUTPUT_BUFFER_SIZE + 1); // +1 for newline
+
+typedef struct SensorReading
+{
+  unsigned long timestamp;
+  float x;
+  float y;
+  float z;
+} SensorReading;
+
+void floatToFixedString(char *buffer, size_t bufferSize, float value)
+{
+  int scaledValue = (int)(value * 1000);
+  snprintf(buffer, bufferSize, "%d.%03d", scaledValue / 1000, abs(scaledValue % 1000));
+}
+
+int sensorReadingToString(char *outputBuffer, size_t bufferSize, const SensorReading &sensorReading)
+{
+  char xBuffer[9], yBuffer[9], zBuffer[9];
+  floatToFixedString(xBuffer, sizeof(xBuffer), sensorReading.x);
+  floatToFixedString(yBuffer, sizeof(yBuffer), sensorReading.y);
+  floatToFixedString(zBuffer, sizeof(zBuffer), sensorReading.z);
+  return snprintf(outputBuffer, bufferSize, "%lu -> (%s, %s, %s)\n", sensorReading.timestamp, xBuffer, yBuffer, zBuffer);
+}
+
+// buffer of reading objects
+SensorReading buffer[BUFFER_SIZE];
+int bufferIndex = 0;
+
+// reusable string buffer for a single reading
+char outputBuffer[OUTPUT_BUFFER_SIZE + 1]; // +1 for newline
+
+// reusable output string buffer to reduce Serial.print(...) calls
+char combinedOutput[combinedOutputSize];
 
 void setup()
 {
@@ -24,24 +60,58 @@ void setup()
   Serial.println("(x, y, z)");
 }
 
-void printAcceleration(float x, float y, float z)
+// flushes buffer to serial
+void flush_buffer(SensorReading *buffer, int &bufferIndex)
 {
-  Serial.print("(");
-  Serial.print(x);
-  Serial.print(", ");
-  Serial.print(y);
-  Serial.print(", ");
-  Serial.print(z);
-  Serial.print(")\n");
+  // set combinedOutput to empty string
+  combinedOutput[0] = '\0';
+
+  for (int i = 0; i < bufferIndex; i++)
+  {
+    int length = sensorReadingToString(outputBuffer, sizeof(outputBuffer), buffer[i]);
+    if (length < 0)
+    {
+      Serial.println("error formatting sensor reading...");
+      continue;
+    }
+    strncat(combinedOutput, outputBuffer, sizeof(combinedOutput) - strlen(combinedOutput) - 1);
+  }
+
+  Serial.print(combinedOutput);
+  Serial.flush();
+  bufferIndex = 0;
 }
 
 void loop()
 {
   float x, y, z;
+  unsigned long currentMillis = 0;
 
   if (IMU.accelerationAvailable())
   {
-    IMU.readAcceleration(x, y, z);
-    printAcceleration(x, y, z);
+    currentMillis = millis();
+    int readResult = IMU.readAcceleration(x, y, z);
+    if (readResult != 1)
+    {
+      Serial.print("Failed to read IMU acceleration with error code ");
+      Serial.print(readResult);
+      Serial.println();
+    }
+    else
+    {
+      // add to serial printing buffer
+      buffer[bufferIndex].timestamp = currentMillis;
+      buffer[bufferIndex].x = x;
+      buffer[bufferIndex].y = y;
+      buffer[bufferIndex].z = z;
+
+      bufferIndex++;
+    }
   }
+
+  if (bufferIndex >= BUFFER_SIZE)
+  {
+    flush_buffer(buffer, bufferIndex);
+  }
+  delay(30);
 }
