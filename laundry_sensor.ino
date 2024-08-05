@@ -83,5 +83,5 @@ void loop()
       outputBuffer[0] = '\0';
     }
   }
-  delay(15);
+  // delay(15);
 }
