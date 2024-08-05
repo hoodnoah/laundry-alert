@@ -1,38 +1,20 @@
 #include <Arduino_LSM6DS3.h>
 
-#define BAUD_RATE 115200
-#define OUTPUT_BUFFER_SIZE 54 // 53 chars + newling
+#include "src/lib/Constants/Constants.h"
+#include "src/lib/Constants/ErrorCodes.h"
 
-typedef struct SensorReading
-{
-  unsigned long timestamp;
-  float x;
-  float y;
-  float z;
-} SensorReading;
+#include "src/lib/Accelerometer/Accelerometer.h"
+#include "src/lib/SensorReading/SensorReading.h"
+#include "src/lib/Window/Window.h"
 
-// reusable reading struct
-SensorReading reading = SensorReading{0, 0.0, 0.0, 0.0};
+// State, ::ACTIVE ::INACTIVE
+MachineState state;
 
-// reusable string buffer for a single reading
-char outputBuffer[OUTPUT_BUFFER_SIZE]; // +1 for newline
+// Accelerometer struct
+Accelerometer mtu;
 
-// converts a float to a fixed point string w/ 3 significant figures
-void floatToFixedString(char *buffer, size_t bufferSize, float value)
-{
-  int scaledValue = (int)(value * 1000);
-  snprintf(buffer, bufferSize, "%d.%03d", scaledValue / 1000, abs(scaledValue % 1000));
-}
-
-// fills a string with a formatted version of the SensorReading struct
-int sensorReadingToString(char *outputBuffer, size_t bufferSize, const SensorReading &sensorReading)
-{
-  char xBuffer[9], yBuffer[9], zBuffer[9];
-  floatToFixedString(xBuffer, sizeof(xBuffer), sensorReading.x);
-  floatToFixedString(yBuffer, sizeof(yBuffer), sensorReading.y);
-  floatToFixedString(zBuffer, sizeof(zBuffer), sensorReading.z);
-  return snprintf(outputBuffer, bufferSize, "%lu -> (%s, %s, %s)\n", sensorReading.timestamp, xBuffer, yBuffer, zBuffer);
-}
+// circular window manager
+Window window;
 
 void setup()
 {
@@ -40,48 +22,54 @@ void setup()
   while (!Serial)
     ; // wait for serial to be ready
 
-  if (!IMU.begin())
+  ErrorCode init_result = Accelerometer_initialize(mtu);
+
+  if (ErrorCode::IMUInitializationFailure == init_result)
   {
     Serial.println("Failed to initialize IMU, halting.");
     while (1)
-      ; // indefinite pause
+      ; // indefinite pause, would be a good time to have some kind of flashing error message (flash red led in a pattern?)
   }
 
-  Serial.print("Accelerometer sample rate = ");
-  Serial.print(IMU.accelerationSampleRate());
-  Serial.println(" Hz");
-  Serial.println();
-  Serial.println("Acceleration in g's:");
-  Serial.println("(x, y, z)");
+  Accelerometer_zero(mtu, ZEROING_SAMPLE_SIZE);
+
+  window = Window_new(SAMPLE_WINDOW_SIZE);
+  state = MachineState::INACTIVE;
 }
 
 void loop()
 {
-  float x, y, z;
-  unsigned long currentMillis = 0;
+  MachineState momentaryState = Accelerometer_try_get_state(mtu);
 
-  if (IMU.accelerationAvailable())
+  if (MachineState::NOT_READY != momentaryState)
   {
-    currentMillis = millis();
-    int readResult = IMU.readAcceleration(x, y, z);
-    if (readResult != 1)
+    bool active;
+    if (MachineState::ACTIVE == momentaryState)
     {
-      Serial.print("Failed to read IMU acceleration with error code ");
-      Serial.print(readResult);
-      Serial.println();
+      active = true;
     }
     else
     {
-      reading.timestamp = currentMillis;
-      reading.x = x;
-      reading.y = y;
-      reading.z = z;
+      active = false;
+    }
 
-      sensorReadingToString(outputBuffer, OUTPUT_BUFFER_SIZE, reading);
-      Serial.print(outputBuffer);
-      Serial.flush();
-      outputBuffer[0] = '\0';
+    Window_AddReading(window, active);
+
+    if (Window_IsActive(window))
+    {
+      if (state != MachineState::ACTIVE) // only alter the state if it's a change
+      {
+        Serial.println("ACTIVE");
+        state = MachineState::ACTIVE;
+      }
+    }
+    else
+    {
+      if (state != MachineState::INACTIVE)
+      {
+        Serial.println("INACTIVE");
+        state = MachineState::INACTIVE;
+      }
     }
   }
-  // delay(15);
 }
