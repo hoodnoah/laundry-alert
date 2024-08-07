@@ -6,6 +6,9 @@ enum class ErrorCode
   Success = 0,
   IMUInitializationFailure,
   IMUNotReady,
+  WiFiNoModule,
+  WiFiFirmwareOutdated,
+  WiFiClientConnectFailed,
 };
 
 #endif

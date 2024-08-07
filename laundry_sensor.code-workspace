@@ -1,0 +1,17 @@
+{
+  "folders": [
+	{
+		"path": "."
+	},
+	{
+		"path": "backend"
+	},
+	{
+		"path": "arduino"
+	},
+	{
+		"path": "data_analysis"
+	}
+],
+  "settings": {}
+}
