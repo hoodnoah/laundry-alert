@@ -6,6 +6,7 @@
 #include "WiFiConnection.h"
 #include "../Constants/ErrorCodes.h"
 #include "../Constants/Constants.h"
+#include "../Secrets/Secrets.h"
 #include "../Accelerometer/Accelerometer.h"
 
 // Attempts to connect the wifi module to the provided connection information,
@@ -35,6 +36,11 @@ ErrorCode WiFiConnection_Connect(WiFiConnection &connection)
 
     connection.status = WiFi.begin(connection.ssid, connection.pass);
     delay(10000); // delay 10 seconds for connection to be established
+
+    IPAddress dns(192, 168, 10, 5);
+    WiFi.setDNS(dns); // set DNS server
+
+    WiFi.hostByName(connection.url, connection.serverIP);
   }
 
   return ErrorCode::Success;
