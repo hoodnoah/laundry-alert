@@ -34,6 +34,11 @@ func main() {
 		}
 
 		washingMachineState.Active = content.Active
+
+		// confirm receipt
+		c.JSON(http.StatusAccepted, gin.H{
+			"active": washingMachineState.Active,
+		})
 	})
 
 	r.Run()

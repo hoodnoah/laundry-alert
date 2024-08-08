@@ -9,6 +9,9 @@ enum class ErrorCode
   WiFiNoModule,
   WiFiFirmwareOutdated,
   WiFiClientConnectFailed,
+  WiFiClientTimeout,
+  HttpClientPostFailed,
+  HttpClientPostRejected,
 };
 
 #endif

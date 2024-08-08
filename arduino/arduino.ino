@@ -1,6 +1,7 @@
 // constants
 #include "src/lib/Constants/Constants.h"
 #include "src/lib/Constants/ErrorCodes.h"
+#include "src/lib/Secrets/Secrets.h"
 
 // local lib
 #include "src/lib/Accelerometer/Accelerometer.h"
@@ -18,7 +19,7 @@ Accelerometer mtu;
 Window window;
 
 // wifi connection
-WiFiConnection connection;
+WiFiConnection connection(NETWORK, NETWORK_PASS, HOSTNAME, HOSTPORT, ENDPOINT);
 
 void setup()
 {
@@ -35,20 +36,8 @@ void setup()
       ; // indefinite pause, would be a good time to have some kind of flashing error message (flash red led in a pattern?)
   }
 
-  // wait 10 seconds to account for finishing plugging in/perturbing device
-  // to allow for accurate zeroing
-  delay(10000);
-
-  // find the accelerometer's zero
-  Accelerometer_zero(mtu, ZEROING_SAMPLE_SIZE);
-
-  // initialize the rolling window and machine's state
-  window = Window_new(SAMPLE_WINDOW_SIZE);
-  state = MachineState::INACTIVE;
-
   // set up wifi connection
-  connection = WiFiConnection(hostName, hostPort, endPoint);
-  init_result = WiFiConnection_Initialize(connection);
+  init_result = WiFiConnection_Connect(connection);
   if (ErrorCode::WiFiNoModule == init_result)
   {
     Serial.println("Failed to initialize the wifi module: No Module Error.");
@@ -61,12 +50,29 @@ void setup()
     while (1)
       ;
   }
+  else if (ErrorCode::WiFiClientTimeout == init_result)
+  {
+    Serial.println("Failed to initialize the wifi module: Timed out.");
+    while (1)
+      ;
+  }
   else if (ErrorCode::Success != init_result)
   {
     Serial.println("Failed to initialize the wifi module: Unspecified error.");
     while (1)
       ;
   }
+
+  Serial.println("Set up wifi connection");
+
+  // find the accelerometer's zero
+  Accelerometer_zero(mtu, ZEROING_SAMPLE_SIZE);
+
+  Serial.println("Zeroed accelerometer");
+
+  // initialize the rolling window and machine's state
+  window = Window_new(SAMPLE_WINDOW_SIZE);
+  state = MachineState::INACTIVE;
 }
 
 void loop()
@@ -89,23 +95,36 @@ void loop()
     // push the new reading onto the rolling window
     Window_AddReading(window, active);
 
-    // evaluate the rolling window for overall activity
-    if (Window_IsActive(window))
+    // evaluate the rolling window for overall activity, note if it's a change from the last measurement
+    bool currentlyActive = Window_IsActive(window);
+    bool stateChanged = (currentlyActive && (MachineState::ACTIVE != state)) || (!currentlyActive && (MachineState::INACTIVE != state));
+
+    if (stateChanged)
     {
-      if (state != MachineState::ACTIVE) // only alter the state if it's a change
+      if (currentlyActive)
       {
-        Serial.println("ACTIVE");
         state = MachineState::ACTIVE;
-        WiFiConnection_SendStatus(connection, state);
+        Serial.print("Sending state ACTIVE to server... ");
       }
-    }
-    else
-    {
-      if (state != MachineState::INACTIVE)
+      else
       {
-        Serial.println("INACTIVE");
         state = MachineState::INACTIVE;
-        WiFiConnection_SendStatus(connection, state);
+        Serial.print("Sending state INACTIVE to server... ");
+      }
+
+      ErrorCode sendResult = WiFiConnection_SendStatus(connection, state);
+
+      if (ErrorCode::HttpClientPostRejected == sendResult)
+      {
+        Serial.print("Error 400: POST request rejected by server.\n");
+      }
+      else if (ErrorCode::Success != sendResult)
+      {
+        Serial.print("Error: POST request failed for unidentified reason.\n");
+      }
+      else if (ErrorCode::Success == sendResult)
+      {
+        Serial.print("Ok\n");
       }
     }
   }
