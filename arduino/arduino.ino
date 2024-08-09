@@ -27,6 +27,9 @@ void setup()
   while (!Serial)
     ; // wait for serial to be ready
 
+  // Set up built in LED as running/idle status output
+  pinMode(LED_BUILTIN, OUTPUT);
+
   ErrorCode init_result = Accelerometer_initialize(mtu);
 
   if (ErrorCode::IMUInitializationFailure == init_result)
@@ -104,11 +107,13 @@ void loop()
       if (currentlyActive)
       {
         state = MachineState::ACTIVE;
+        digitalWrite(LED_BUILTIN, HIGH);
         Serial.print("Sending state ACTIVE to server... ");
       }
       else
       {
         state = MachineState::INACTIVE;
+        digitalWrite(LED_BUILTIN, LOW);
         Serial.print("Sending state INACTIVE to server... ");
       }
 
