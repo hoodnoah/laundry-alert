@@ -18,6 +18,7 @@ struct WiFiConnection
   const char *pass;
   int status;
   const char *url;
+  IPAddress serverIP;
   uint16_t port;
   const char *urlPath;
   WiFiClient wifiClient;
