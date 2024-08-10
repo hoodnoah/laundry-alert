@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/hoodnoah/laundry-alert/backend/logging"
 )
 
 type State struct {
@@ -11,6 +14,8 @@ type State struct {
 }
 
 func main() {
+	logger := logging.ConsoleLoggerNew()
+
 	washingMachineState := State{
 		Active: false,
 	}
@@ -28,12 +33,15 @@ func main() {
 	r.POST("/state", func(c *gin.Context) {
 		var content State
 		if err := c.ShouldBindJSON(&content); err != nil {
+			logger.Error("Received malformed input, rejecting with Status 400")
+
 			c.Error(err)
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 
 		washingMachineState.Active = content.Active
+		logger.Info(fmt.Sprintf("Set Active: %t", washingMachineState.Active))
 
 		// confirm receipt
 		c.JSON(http.StatusAccepted, gin.H{
