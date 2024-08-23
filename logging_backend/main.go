@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -16,7 +17,7 @@ func main() {
 	logger := logging.ConsoleLoggerNew()
 
 	// set up db connection
-	dbConnection, err := database.NewSqLiteDbConnection("laundry_alert.db", logger)
+	dbConnection, err := database.NewSqLiteDbConnection("laundry-logger.db", logger)
 	if err != nil {
 		fmt.Printf("failed to set up db connection w/ error: %v", err)
 		os.Exit(1)
@@ -32,7 +33,15 @@ func main() {
 			return
 		}
 
+		// add absolute timestamp
+		content.ReceivedAt = time.Now()
+
+		// add to db
 		dbConnection.AddReading(&content)
+
+		// c.JSON(http.StatusAccepted, gin.H{"message": "received, written"})
+		// send simple confirmation of receipt
+		c.String(http.StatusAccepted, "")
 	})
 
 	r.Run()
