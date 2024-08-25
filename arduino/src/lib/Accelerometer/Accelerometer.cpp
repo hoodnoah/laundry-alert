@@ -29,8 +29,14 @@ ErrorCode _Accelerometer_try_read(SensorReading &outputReading)
   }
 
   IMU.readAcceleration(outputReading.x, outputReading.y, outputReading.z);
+  outputReading.timeStampMs = millis();
 
   return ErrorCode::Success;
+}
+
+ErrorCode Accelerometer_Read(SensorReading &outputReading)
+{
+  return _Accelerometer_try_read(outputReading);
 }
 
 int32_t floatToFixed(float value)
@@ -103,4 +109,9 @@ MachineState Accelerometer_try_get_state(Accelerometer &mtu)
   float magnitude = _Accelerometer_calc_normalized_magnitude(mtu.zero, mtu.reading);
 
   return _Accelerometer_classify_state(magnitude);
+}
+
+float Accelerometer_get_sample_rate()
+{
+  return IMU.accelerationSampleRate();
 }

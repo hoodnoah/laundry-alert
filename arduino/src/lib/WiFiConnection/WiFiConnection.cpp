@@ -80,3 +80,35 @@ ErrorCode WiFiConnection_SendStatus(WiFiConnection &connection, MachineState sta
 
   return ErrorCode::HttpClientPostFailed;
 }
+
+ErrorCode WiFiConnection_SendReading(WiFiConnection &connection, SensorReading &reading, unsigned long timestampMs)
+{
+  // create json
+  connection.jsonDoc["timeStampMs"] = timestampMs;
+  connection.jsonDoc["x"] = reading.x;
+  connection.jsonDoc["y"] = reading.y;
+  connection.jsonDoc["z"] = reading.z;
+
+  // serialize json into string
+  String jsonString;
+  serializeJson(connection.jsonDoc, jsonString);
+
+  // create HTTP POST request
+  connection.httpClient.post(connection.urlPath, "application/json", jsonString);
+  // int statusCode = connection.httpClient.responseStatusCode();
+  int statusCode = connection.httpClient.parseInt();
+
+  connection.httpClient.stop(); // close connection
+
+  // if (202 == statusCode)
+  // {
+  //   return ErrorCode::Success;
+  // }
+  // else if (400 == statusCode)
+  // {
+  //   return ErrorCode::HttpClientPostRejected;
+  // }
+
+  // return ErrorCode::HttpClientPostFailed;
+  return ErrorCode::Success;
+}

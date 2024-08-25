@@ -25,7 +25,7 @@ func main() {
 	logger := logging.ConsoleLoggerNew()
 
 	// set up db connection
-	dbConnection, err := database.NewSqLiteDbConnection("laundry-logger.db", logger)
+	dbConnection, err := database.NewSqLiteDbConnection("/opt/laundry-logger/laundry-logger.db", logger)
 	if err != nil {
 		fmt.Printf("failed to set up db connection w/ error: %v", err)
 		os.Exit(1)
@@ -49,7 +49,7 @@ func main() {
 				if websocket.IsUnexpectedCloseError(err) {
 					logger.Error(fmt.Sprintf("unexpected close error: %v", err))
 				} else {
-					logger.Error(fmt.Sprintf("error reading JSON: %v", err))
+					logger.Error(fmt.Sprintf("failed to read JSON from connection with error: %v", err))
 				}
 				break
 			}

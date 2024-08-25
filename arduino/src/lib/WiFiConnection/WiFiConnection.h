@@ -4,6 +4,7 @@
 // external lib
 #include "WiFiNINA.h"
 #include "ArduinoHttpClient.h"
+#include "ArduinoJson.h"
 
 // local lib
 #include "../Constants/ErrorCodes.h"
@@ -23,11 +24,13 @@ struct WiFiConnection
   const char *urlPath;
   WiFiClient wifiClient;
   HttpClient httpClient;
+  StaticJsonDocument<200> jsonDoc;
 
   WiFiConnection(const char *ssid, const char *pass, const char *url, const uint16_t port, const char *urlPath) : ssid(ssid), pass(pass), url(url), port(port), urlPath(urlPath), wifiClient(), httpClient(HttpClient(wifiClient, url, port)) {}
 };
 
 ErrorCode WiFiConnection_Connect(WiFiConnection &connection);
 ErrorCode WiFiConnection_SendStatus(WiFiConnection &connection, MachineState state);
+ErrorCode WiFiConnection_SendReading(WiFiConnection &connection, SensorReading &reading, unsigned long timeStampMS);
 
 #endif

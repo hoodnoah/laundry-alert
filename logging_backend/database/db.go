@@ -27,11 +27,11 @@ const buffer_size_readings = 520
 const max_flush_time_seconds = time.Second * 10
 
 type AccelerometerReading struct {
-	TimeStampMs uint32 `json:"timeStampMs"`
-	ReceivedAt  time.Time
-	X           float32 `json:"x"`
-	Y           float32 `json:"y"`
-	Z           float32 `json:"z"`
+	TimeStampMs uint32    `json:"timeStampMs"`
+	ReceivedAt  time.Time `json:"receivedAt,omitempty"`
+	X           float32   `json:"x"`
+	Y           float32   `json:"y"`
+	Z           float32   `json:"z"`
 }
 
 type IDBConnection interface {

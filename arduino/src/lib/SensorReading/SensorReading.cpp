@@ -6,5 +6,5 @@
 
 SensorReading SensorReading_new()
 {
-  return SensorReading(0.0, 0.0, 0.0);
+  return SensorReading(0, 0.0, 0.0, 0.0);
 }

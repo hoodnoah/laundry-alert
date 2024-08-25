@@ -31,6 +31,8 @@ struct Accelerometer
 
 ErrorCode Accelerometer_initialize(Accelerometer &mtu);
 MachineState Accelerometer_try_get_state(Accelerometer &mtu);
+ErrorCode Accelerometer_Read(SensorReading &outputReading);
+float Accelerometer_get_sample_rate();
 void Accelerometer_zero(Accelerometer &mtu, int numObservations);
 
 #endif
