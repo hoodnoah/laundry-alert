@@ -6,112 +6,112 @@
 #include "../Constants/Constants.h"
 #include "../Constants/ErrorCodes.h"
 
-ErrorCode Accelerometer_initialize(Accelerometer &mtu)
+// constructor
+Accelerometer::Accelerometer(float threshold)
+{
+  this->reading = SensorReading();
+  this->threshold = threshold;
+  this->x, this->y, this->z = 0.0;
+  this->xZero, this->yZero, this->zZero, this->magnitudeZero = 0.0;
+  this->initialized = false;
+}
+
+// attempts to begin the IMU
+// returning ErrorCode::ImuInitializationFailure on fail,
+// ErrorCode::Success on success
+ErrorCode Accelerometer::initialize()
 {
   if (!IMU.begin())
   {
     return ErrorCode::IMUInitializationFailure;
   }
 
-  mtu.isInitialized = true;
+  this->initialized = true;
   return ErrorCode::Success;
 }
 
-// Attempts to read accelerometer values into a provided
-// SensorReading struct.
-// Returns ErrorCode::IMUNotReady when the acceleration is unavailable,
+// reads the acceleration into a provided SensorReading object
+// returns ErrorCode::IMUNotReady when acceleration is unavailable
+// ErrorCode::IMUNotInitialized if the accelerometer has not been initialized
 // ErrorCode::Success when the reading is taken
-ErrorCode _Accelerometer_try_read(SensorReading &outputReading)
+ErrorCode Accelerometer::readAcceleration()
 {
+  if (!this->initialized)
+  {
+    return ErrorCode::IMUNotInitialized;
+  }
+
   if (!IMU.accelerationAvailable())
   {
     return ErrorCode::IMUNotReady;
   }
 
-  IMU.readAcceleration(outputReading.x, outputReading.y, outputReading.z);
-  outputReading.timeStampMs = millis();
+  IMU.readAcceleration(this->x, this->y, this->z);
+
+  this->reading.setTimeStampMs(millis());
+  this->reading.setX(this->x - this->xZero);
+  this->reading.setY(this->y - this->yZero);
+  this->reading.setZ(this->z - this->zZero);
 
   return ErrorCode::Success;
 }
 
-ErrorCode Accelerometer_Read(SensorReading &outputReading)
+// zero the accelerometer; take the mean of several readings
+// and store them as dopes for each acceleration vector dimension, to be
+// used to isolate the *dynamic* acceleration in any dimension.
+ErrorCode Accelerometer::zero()
 {
-  return _Accelerometer_try_read(outputReading);
-}
-
-int32_t floatToFixed(float value)
-{
-  return static_cast<int32_t>(round(value * 1000));
-}
-
-// classifies an accelerometer reading as "active" or "inactive"
-// based on its magnitude and constant threshold values defined in
-// src/lib/Constants/Constants.h
-MachineState _Accelerometer_classify_state(float magnitude)
-{
-  int magnitude_fixed = floatToFixed(magnitude);
-
-  if (magnitude_fixed > ACTIVE_UPPER_THRESHOLD || magnitude_fixed < ACTIVE_LOWER_THRESHOLD)
+  if (!this->initialized)
   {
-    return MachineState::ACTIVE;
+    return ErrorCode::IMUNotInitialized;
   }
 
-  return MachineState::INACTIVE;
-}
+  // collect sample of readings
+  size_t num_obs = 0;
+  float sumX, sumY, sumZ, sumMagnitude = 0.0;
 
-// finds a mean, and standard deviation for normalization of
-// accelerometer readings in different orientations/scenarios
-void Accelerometer_zero(Accelerometer &mtu, int numObservations)
-{
-  float mean = 0.0;
-  float m2 = 0.0;
-  int n = 0;
-
-  for (int i = 0; i < numObservations; i++)
+  while (num_obs < ACCELEROMETER_ZERO_OBSERVATIONS)
   {
-    if (_Accelerometer_try_read(mtu.reading) == ErrorCode::Success)
+    ErrorCode readResult = this->readAcceleration();
+    if (ErrorCode::Success == readResult)
     {
-      float magnitude = sqrt(pow(mtu.reading.x, 2) + pow(mtu.reading.y, 2) + pow(mtu.reading.z, 2));
-      n++;
-      float delta = magnitude - mean;
-      mean += delta / n;
-      float delta2 = magnitude - mean;
-      m2 += delta * delta2;
+      sumX += this->reading.getX();
+      sumY += this->reading.getY();
+      sumZ += this->reading.getZ();
+      sumMagnitude += this->reading.getMagnitude();
+    }
+    else if (ErrorCode::IMUNotReady != readResult)
+    {
+      return readResult;
     }
   }
 
-  mtu.zero.mean = mean;
-  mtu.zero.std = (n > 1) ? sqrt(m2 / (n - 1)) : 0.0;
-  mtu.isZeroed = true;
+  // set vector dopes to mean of zeroing observations
+  this->xZero = sumX / num_obs;
+  this->yZero = sumY / num_obs;
+  this->zZero = sumZ / num_obs;
+  this->magnitudeZero = sumMagnitude / num_obs;
+
+  return ErrorCode::Success;
 }
 
-float _Accelerometer_calc_normalized_magnitude(const AccelerometerZero &zero, const SensorReading &reading)
+// classifies the instantaneous state as active or not based on
+// the threshold provided to the constructor.
+ErrorCode Accelerometer::isActive(bool &active)
 {
-  float raw_magnitude = sqrt(pow(reading.x, 2) + pow(reading.y, 2) + pow(reading.z, 2));
-  float normalized_magnitude = ((raw_magnitude - zero.mean) / zero.std) * BASELINE_STD + BASELINE_MEAN;
-  return normalized_magnitude;
-}
+  ErrorCode readResult = this->readAcceleration();
 
-// attempts to get the state of the system from the accelerometer.
-// returns a MachineState:
-// ::ACTIVE -> machine read as active
-// ::INACTIVE -> machine read as inactive
-// ::NOT_READY -> accelerometer not ready to return a result
-MachineState Accelerometer_try_get_state(Accelerometer &mtu)
-{
-  ErrorCode readResult = _Accelerometer_try_read(mtu.reading);
-
-  if (ErrorCode::IMUNotReady == readResult)
+  if ((ErrorCode::Success != readResult) || (ErrorCode::IMUNotReady != readResult))
   {
-    return MachineState::NOT_READY;
+    return readResult;
   }
 
-  float magnitude = _Accelerometer_calc_normalized_magnitude(mtu.zero, mtu.reading);
+  // wait for reading to be ready, if it isn't yet
+  while (ErrorCode::IMUNotReady == readResult)
+  {
+    ;
+  }
 
-  return _Accelerometer_classify_state(magnitude);
-}
-
-float Accelerometer_get_sample_rate()
-{
-  return IMU.accelerationSampleRate();
+  active = abs(this->reading.getMagnitude()) > this->threshold;
+  return ErrorCode::Success;
 }

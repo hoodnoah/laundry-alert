@@ -9,24 +9,30 @@
 #include "../Secrets/Secrets.h"
 #include "../Accelerometer/Accelerometer.h"
 
-// Attempts to connect the wifi module to the provided connection information,
-// fails after a set number of retries.
-ErrorCode WiFiConnection_Connect(WiFiConnection &connection)
+WiFiConnection::WiFiConnection(const char *ssid, const char *url, const uint16_t port, const char *urlPath)
+{
+  this->ssid = ssid;
+  this->url = url;
+  this->port = port;
+  this->urlPath = urlPath;
+  this->status = WL_DISCONNECTED;
+  this->wifiClient = WiFiClient();
+  this->httpClient = HttpClient(this->wifiClient, url, port);
+}
+
+ErrorCode WiFiConnection::connect()
 {
   int numTries = 0;
-
-  // wifi module not connected/unavailable
-  if (WiFi.status() == WL_NO_MODULE)
+  if (WL_NO_MODULE == WiFi.status())
   {
     return ErrorCode::WiFiNoModule;
   }
-
-  if (WiFi.firmwareVersion() < WIFI_FIRMWARE_LATEST_VERSION)
+  else if (WiFi.firmwareVersion() < WIFI_FIRMWARE_LATEST_VERSION)
   {
     return ErrorCode::WiFiFirmwareOutdated;
   }
 
-  while (connection.status != WL_CONNECTED)
+  while (WL_CONNECTED != this->status)
   {
     if (numTries > WIFI_CONNECT_RETRY_LIMIT)
     {
@@ -34,40 +40,32 @@ ErrorCode WiFiConnection_Connect(WiFiConnection &connection)
     }
     numTries++;
 
-    connection.status = WiFi.begin(connection.ssid, connection.pass);
-    delay(10000); // delay 10 seconds for connection to be established
+    this->status = WiFi.begin(this->ssid, this->pass);
+    delay(7000);
 
     IPAddress dns(192, 168, 10, 5);
-    WiFi.setDNS(dns); // set DNS server
-
-    WiFi.hostByName(connection.url, connection.serverIP);
+    WiFi.setDNS(dns);
+    WiFi.hostByName(this->url, this->serverIP);
   }
 
   return ErrorCode::Success;
 }
 
-// prepares a json payload
-ErrorCode WiFiConnection_SendStatus(WiFiConnection &connection, MachineState state)
+ErrorCode WiFiConnection::sendStatus(WasherState &state)
 {
   bool status = false;
-  if (MachineState::ACTIVE == state)
+  if (Activity::ACTIVE == state.getState())
   {
     status = true;
   }
 
-  // create json
-  StaticJsonDocument<200> jsonDoc;
-  jsonDoc["active"] = status;
-
-  // serialize json into string
+  this->jsonDoc['active'] = status;
   String jsonString;
-  serializeJson(jsonDoc, jsonString);
+  serializeJson(this->jsonDoc, jsonString);
 
-  // create HTTP POST request
-  connection.httpClient.post(connection.urlPath, "application/json", jsonString);
-  int statusCode = connection.httpClient.responseStatusCode();
-
-  connection.httpClient.stop(); // close connection
+  this->httpClient.post(this->urlPath, "application/json", jsonString);
+  int statusCode = this->httpClient.responseStatusCode();
+  this->httpClient.stop(); // close connection
 
   if (202 == statusCode)
   {
@@ -79,36 +77,4 @@ ErrorCode WiFiConnection_SendStatus(WiFiConnection &connection, MachineState sta
   }
 
   return ErrorCode::HttpClientPostFailed;
-}
-
-ErrorCode WiFiConnection_SendReading(WiFiConnection &connection, SensorReading &reading, unsigned long timestampMs)
-{
-  // create json
-  connection.jsonDoc["timeStampMs"] = timestampMs;
-  connection.jsonDoc["x"] = reading.x;
-  connection.jsonDoc["y"] = reading.y;
-  connection.jsonDoc["z"] = reading.z;
-
-  // serialize json into string
-  String jsonString;
-  serializeJson(connection.jsonDoc, jsonString);
-
-  // create HTTP POST request
-  connection.httpClient.post(connection.urlPath, "application/json", jsonString);
-  // int statusCode = connection.httpClient.responseStatusCode();
-  int statusCode = connection.httpClient.parseInt();
-
-  connection.httpClient.stop(); // close connection
-
-  // if (202 == statusCode)
-  // {
-  //   return ErrorCode::Success;
-  // }
-  // else if (400 == statusCode)
-  // {
-  //   return ErrorCode::HttpClientPostRejected;
-  // }
-
-  // return ErrorCode::HttpClientPostFailed;
-  return ErrorCode::Success;
 }

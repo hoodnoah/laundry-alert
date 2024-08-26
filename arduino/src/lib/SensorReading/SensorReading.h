@@ -5,41 +5,28 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-struct SensorReading : public Printable
+class SensorReading : public Printable
 {
+public:
+  SensorReading();
+  size_t printTo(Print &p) const;
+
+  // setters
+  void setTimeStampMs(unsigned long timeStampMs);
+  void setX(float x);
+  void setY(float y);
+  void setZ(float z);
+
+  // getters
+  float getTimeStampMs();
+  float getX();
+  float getY();
+  float getZ();
+  float getMagnitude();
+
+private:
   unsigned long timeStampMs;
-  float x;
-  float y;
-  float z;
-
-  SensorReading(unsigned long timeStampMs = 0, float x = 0.0, float y = 0.0, float z = 0.0) : timeStampMs(timeStampMs), x(x), y(y), z(z) {}
-  size_t printTo(Print &p) const override
-  {
-    size_t n = 0;
-    n += p.print("(");
-    n += p.print(x);
-    n += p.print(", ");
-    n += p.print(y);
-    n += p.print(", ");
-    n += p.print(z);
-    n += p.print(")");
-    return n;
-  }
-
-  String toJson() const
-  {
-    StaticJsonDocument<200> doc;
-    doc["timeStampMs"] = timeStampMs;
-    doc["x"] = x;
-    doc["y"] = y;
-    doc["z"] = z;
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-    return jsonString;
-  }
+  float x, y, z;
 };
-
-SensorReading SensorReading_new();
 
 #endif
