@@ -16,3 +16,5 @@ venv
 data
 Secrets
 backend/dist
+stress_test.py
+*.db
