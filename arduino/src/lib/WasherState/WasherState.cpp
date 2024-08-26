@@ -1,5 +1,8 @@
 #include "WasherState.h"
 
+// external lib
+#include <Arduino.h>
+
 // constructor
 WasherState::WasherState(unsigned long updateCoolDownMs)
 {

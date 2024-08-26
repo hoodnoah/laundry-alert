@@ -1,5 +1,6 @@
 // external libraries
 #include "WiFiNINA.h"
+#include "ArduinoHttpClient.h"
 #include "ArduinoJson.h"
 
 // local lib headers
@@ -9,15 +10,15 @@
 #include "../Secrets/Secrets.h"
 #include "../Accelerometer/Accelerometer.h"
 
-WiFiConnection::WiFiConnection(const char *ssid, const char *url, const uint16_t port, const char *urlPath)
+WiFiConnection::WiFiConnection(const char *ssid, const char *pass, const char *url, const uint16_t port, const char *urlPath)
+    : wifiClient(), httpClient(HttpClient(wifiClient, url, port))
 {
   this->ssid = ssid;
+  this->pass = pass;
   this->url = url;
   this->port = port;
   this->urlPath = urlPath;
   this->status = WL_DISCONNECTED;
-  this->wifiClient = WiFiClient();
-  this->httpClient = HttpClient(this->wifiClient, url, port);
 }
 
 ErrorCode WiFiConnection::connect()

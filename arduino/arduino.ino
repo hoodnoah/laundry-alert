@@ -72,7 +72,7 @@ void setup()
   }
 
   // set up wifi connection
-  init_result = WiFiConnection_Connect(connection);
+  init_result = connection.connect();
   if(ErrorCode::Success != init_result) {
     DEBUG_PRINTLN("Failed to initialize the wifi module.");
     flash_led();

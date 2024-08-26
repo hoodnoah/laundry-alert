@@ -17,7 +17,7 @@
 class WiFiConnection
 {
 public:
-  WiFiConnection(const char *ssid, const char *url, const uint16_t port, const char *urlPath);
+  WiFiConnection(const char *ssid, const char *pass, const char *url, const uint16_t port, const char *urlPath);
   ErrorCode connect();
   ErrorCode sendStatus(WasherState &state);
 
