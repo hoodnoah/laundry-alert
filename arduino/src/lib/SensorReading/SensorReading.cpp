@@ -1,5 +1,7 @@
 #include <math.h>
 
+#include "../Config/Config.h"
+
 #include "SensorReading.h"
 #include "../Accelerometer/Accelerometer.h"
 #include "../Constants/Constants.h"

@@ -3,6 +3,8 @@
 // external lib
 #include <Arduino.h>
 
+#include "../Config/Config.h"
+
 // constructor
 WasherState::WasherState(unsigned long updateCoolDownMs)
 {
@@ -27,7 +29,7 @@ bool WasherState::trySetState(Activity newState)
     this->state = newState;
   }
 
-  return oldState == this->state;
+  return oldState != this->state;
 }
 
 // attempts to set state active
@@ -72,4 +74,20 @@ bool WasherState::coolDownExpired()
 void WasherState::resetLastUpdateMs()
 {
   this->lastStateUpdateMs = millis();
+}
+
+// override printable method for simple serial printing
+size_t WasherState::printTo(Print &p) const
+{
+  size_t n = 0;
+  if (Activity::ACTIVE == this->state)
+  {
+    n += p.print("ACTIVE");
+  }
+  else
+  {
+    n += p.print("IDLE");
+  }
+
+  return n;
 }

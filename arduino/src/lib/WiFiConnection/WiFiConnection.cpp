@@ -3,15 +3,18 @@
 #include "ArduinoHttpClient.h"
 #include "ArduinoJson.h"
 
+#include "../Config/Config.h"
+
 // local lib headers
 #include "WiFiConnection.h"
 #include "../Constants/ErrorCodes.h"
 #include "../Constants/Constants.h"
 #include "../Secrets/Secrets.h"
 #include "../Accelerometer/Accelerometer.h"
+#include "../DebugPrint/DebugPrint.h"
 
 WiFiConnection::WiFiConnection(const char *ssid, const char *pass, const char *url, const uint16_t port, const char *urlPath)
-    : wifiClient(), httpClient(HttpClient(wifiClient, url, port))
+    : wifiClient(), httpClient(wifiClient, url, port)
 {
   this->ssid = ssid;
   this->pass = pass;
@@ -44,9 +47,13 @@ ErrorCode WiFiConnection::connect()
     this->status = WiFi.begin(this->ssid, this->pass);
     delay(7000);
 
+    // lookup url w/ dns
     IPAddress dns(192, 168, 10, 5);
     WiFi.setDNS(dns);
     WiFi.hostByName(this->url, this->serverIP);
+
+    // set timeout
+    this->httpClient.setTimeout(5000);
   }
 
   return ErrorCode::Success;
@@ -60,7 +67,7 @@ ErrorCode WiFiConnection::sendStatus(WasherState &state)
     status = true;
   }
 
-  this->jsonDoc['active'] = status;
+  this->jsonDoc["active"] = status;
   String jsonString;
   serializeJson(this->jsonDoc, jsonString);
 

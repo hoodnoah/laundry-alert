@@ -1,13 +1,15 @@
 #ifndef WASHERSTATE_H
 #define WASHERSTATE_H
 
+#include <Arduino.h>
+
 enum Activity
 {
   ACTIVE,
   IDLE
 };
 
-class WasherState
+class WasherState : public Printable
 {
 public:
   WasherState(unsigned long updateCoolDownMs);
@@ -17,6 +19,9 @@ public:
   // setters
   bool setActive();
   bool setIdle();
+
+  // overrides
+  size_t printTo(Print &p) const;
 
 private:
   // vars

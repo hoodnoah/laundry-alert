@@ -15,6 +15,7 @@ public:
 private:
   SensorReading reading;
   ErrorCode readAcceleration();
+  ErrorCode maxMagnitudeSample(size_t sampleSize);
   float x, y, z;
   float xZero, yZero, zZero, magnitudeZero;
   bool initialized;

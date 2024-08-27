@@ -1,10 +1,13 @@
-#include "Arduino_LSM6DS3.h" // accelerometer lib
+// external lib
+#include "Arduino_LSM6DS3.h"
 
+// local lib
+#include "../Config/Config.h"
 #include "Accelerometer.h"
-
 #include "../SensorReading/SensorReading.h"
 #include "../Constants/Constants.h"
 #include "../Constants/ErrorCodes.h"
+#include "../DebugPrint/DebugPrint.h"
 
 // constructor
 Accelerometer::Accelerometer(float threshold)
@@ -56,6 +59,44 @@ ErrorCode Accelerometer::readAcceleration()
   return ErrorCode::Success;
 }
 
+ErrorCode Accelerometer::maxMagnitudeSample(size_t numSamples)
+{
+  size_t samplesTaken = 0;
+
+  float maxX, maxY, maxZ, maxMagnitude = 0.0;
+
+  while (samplesTaken++ < numSamples)
+  {
+    // try and read until we get a reading, or error
+    ErrorCode readResult = ErrorCode::IMUNotReady;
+    while (ErrorCode::IMUNotReady == readResult) // try to take readings until not busy
+    {
+      readResult = this->readAcceleration();
+    }
+
+    if (ErrorCode::Success != readResult)
+    {
+      return readResult;
+    }
+
+    // determine if the latest reading exceeds previous maxima
+    if (abs(this->reading.getMagnitude()) > maxMagnitude)
+    {
+      maxX = this->reading.getX();
+      maxY = this->reading.getY();
+      maxZ = this->reading.getZ();
+      maxMagnitude = abs(this->reading.getMagnitude());
+    }
+  }
+
+  // set reading to maximum values
+  this->reading.setX(maxX);
+  this->reading.setY(maxY);
+  this->reading.setZ(maxZ);
+
+  return ErrorCode::Success;
+}
+
 // zero the accelerometer; take the mean of several readings
 // and store them as dopes for each acceleration vector dimension, to be
 // used to isolate the *dynamic* acceleration in any dimension.
@@ -79,6 +120,7 @@ ErrorCode Accelerometer::zero()
       sumY += this->reading.getY();
       sumZ += this->reading.getZ();
       sumMagnitude += this->reading.getMagnitude();
+      num_obs++;
     }
     else if (ErrorCode::IMUNotReady != readResult)
     {
@@ -99,19 +141,13 @@ ErrorCode Accelerometer::zero()
 // the threshold provided to the constructor.
 ErrorCode Accelerometer::isActive(bool &active)
 {
-  ErrorCode readResult = this->readAcceleration();
+  ErrorCode sampleResult = this->maxMagnitudeSample(ACCELEROMETER_MAX_MAGNITUDE_SAMPLE_SIZE);
 
-  if ((ErrorCode::Success != readResult) || (ErrorCode::IMUNotReady != readResult))
+  if (ErrorCode::Success != sampleResult)
   {
-    return readResult;
+    return sampleResult;
   }
 
-  // wait for reading to be ready, if it isn't yet
-  while (ErrorCode::IMUNotReady == readResult)
-  {
-    ;
-  }
-
-  active = abs(this->reading.getMagnitude()) > this->threshold;
+  active = (abs(this->reading.getMagnitude()) > this->threshold);
   return ErrorCode::Success;
 }
